@@ -9,20 +9,22 @@ public class App extends PApplet {
     }
 
     // How to use a class outside the main
-    Dot dot = new Dot(this);
+    Kinect kinect;
 
     @Override
     public void settings() {
-        fullScreen();
+        size(1920, 1080, P3D);
     }
 
     @Override
     public void setup() {
+        kinect = new Kinect(this);
     }
 
     @Override
     public void draw() {
         background(0);
-        dot.draw();
+        kinect.draw();
+        kinect.showFPS();
     }
 }
