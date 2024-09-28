@@ -1,11 +1,11 @@
-// ICON LAB 2024
+package com.icon;// ICON LAB 2024
 
 import processing.core.*;
 
 public class App extends PApplet {
 
     public static void main(String[] args) {
-        PApplet.main(new String[] { "App" });
+        PApplet.main(new String[] { "com.icon.App" });
     }
 
     // How to use a class outside the main
