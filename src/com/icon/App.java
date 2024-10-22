@@ -13,12 +13,14 @@ public class App extends PApplet {
 
     @Override
     public void settings() {
-        size(1920, 1080, P3D);
+        // change it to actual screen size
+        size(1680, 1050, P3D);
     }
 
     @Override
     public void setup() {
         kinect = new Kinect(this);
+        kinect.calibrate();
     }
 
     @Override

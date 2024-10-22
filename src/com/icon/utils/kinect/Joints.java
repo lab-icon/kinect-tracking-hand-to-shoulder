@@ -4,7 +4,7 @@ import com.icon.App;
 
 import KinectPV2.*;
 import org.jetbrains.annotations.NotNull;
-import processing.core.PApplet;
+import processing.core.*;
 
 public class Joints extends PApplet {
 
@@ -36,14 +36,14 @@ public class Joints extends PApplet {
         this.app.popMatrix();
     }
 
-    public void drawBodySpace(@NotNull KJoint joint, @NotNull KJoint shoulderJoint1,@NotNull KJoint shoulderJoint2){
+    public void drawBodySpace(@NotNull KJoint joint, @NotNull KJoint shoulderJoint1,@NotNull KJoint shoulderJoint2, @NotNull float boxHeight){
         this.app.pushMatrix();
         this.app.noFill();
         this.app.strokeWeight(10);
         this.app.stroke(0, 0, 225);
         this.app.translate(joint.getX(), joint.getY());
         this.app.rectMode(CENTER);
-        this.app.rect(0, 0, calcJointDistance(shoulderJoint1, shoulderJoint2) * 4, 200);
+        this.app.rect(0, 0, calcJointDistance(shoulderJoint1, shoulderJoint2) * 4, boxHeight * 2);
         this.app.popMatrix();
     }
 
@@ -52,6 +52,43 @@ public class Joints extends PApplet {
         handState(joint.getState());
         this.app.pushMatrix();
         this.app.translate(joint.getX(), joint.getY(), joint.getZ());
+        this.app.ellipse(0, 0, 70, 70);
+        this.app.popMatrix();
+    }
+
+
+    // OVERLOADS
+    // Joints.java
+    public void drawJoint(@NotNull PVector joint) {
+        this.app.pushMatrix();
+        this.app.translate(joint.x, joint.y, joint.z);
+        this.app.ellipse(0, 0, 25, 25);
+        this.app.popMatrix();
+    }
+
+    public void drawLine(@NotNull PVector joint1, @NotNull PVector joint2) {
+        this.app.pushMatrix();
+        this.app.fill(0, 0, 255);
+        this.app.line(joint1.x, joint1.y, joint1.z, joint2.x, joint2.y, joint2.z);
+        this.app.popMatrix();
+    }
+
+    public void drawBodySpace(@NotNull PVector joint, PVector shoulderJoint1, PVector shoulderJoint2, float boxHeight) {
+        this.app.pushMatrix();
+        this.app.noFill();
+        this.app.strokeWeight(10);
+        this.app.stroke(0, 0, 225);
+        this.app.translate(joint.x, joint.y);
+        this.app.rectMode(CENTER);
+        this.app.rect(0, 0, PVector.dist(shoulderJoint1, shoulderJoint2) * 4, boxHeight * 2);
+        this.app.popMatrix();
+    }
+
+    public void drawHandPoint(@NotNull PVector joint, int state) {
+        this.app.noStroke();
+        handState(state);
+        this.app.pushMatrix();
+        this.app.translate(joint.x, joint.y, joint.z);
         this.app.ellipse(0, 0, 70, 70);
         this.app.popMatrix();
     }
