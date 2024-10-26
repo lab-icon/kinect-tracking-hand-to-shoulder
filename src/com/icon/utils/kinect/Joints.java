@@ -22,6 +22,16 @@ public class Joints extends PApplet {
         drawJoint(joints, KinectPV2.JointType_SpineShoulder);
     }
 
+    public void drawBox(PVector vector, float distance) {
+        this.app.pushMatrix();
+        this.app.noFill();
+        this.app.stroke((float) Math.random(),0,0);
+        this.app.strokeWeight(2);
+        this.app.rectMode(CENTER);
+        this.app.rect(vector.x, vector.y, distance*2, distance*2);
+        this.app.popMatrix();
+    }
+
     public void drawJoint(KJoint @NotNull [] joints, int jointType) {
         this.app.pushMatrix();
         this.app.translate(joints[jointType].getX(), joints[jointType].getY(), joints[jointType].getZ());

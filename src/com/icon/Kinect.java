@@ -12,13 +12,24 @@ public class Kinect extends PApplet {
     private final Joints joints;
     private Boolean isCalibrated;
 
-    private Map<Integer, Float> playerDistances;
+    private final Map<Integer, Float> playerDistances;
+    private final Map<Integer, PVector> leftHandPositions;
+    private final Map<Integer, PVector> rightHandPositions;
+    private final Map<Integer, List<PVector>> leftHandHistory;
+    private final Map<Integer, List<PVector>> rightHandHistory;
+
+    private static final int SMOOTHING_WINDOW = 5;
 
     public Kinect(App app) {
         this.app = app;
         this.joints = new Joints(app);
         this.isCalibrated = false;
+
         this.playerDistances = new HashMap<>();
+        this.leftHandPositions = new HashMap<>();
+        this.rightHandPositions = new HashMap<>();
+        this.leftHandHistory = new HashMap<>();
+        this.rightHandHistory = new HashMap<>();
 
         kinect = new KinectPV2(this.app);
 
@@ -89,7 +100,6 @@ public class Kinect extends PApplet {
         }
     }
 
-    // Kinect.java
     private void removeUntrackedPlayers(ArrayList<KSkeleton> trackedSkeletons) {
         Set<Integer> trackedPlayerIds = new HashSet<>();
         for (KSkeleton skeleton : trackedSkeletons) {
@@ -104,44 +114,110 @@ public class Kinect extends PApplet {
     public void draw() {
         this.app.image(kinect.getColorImage(), 0, 0, this.app.width, this.app.height);
 
+        // Map the skeleton joints to the screen and remove untracked players
         ArrayList<KSkeleton> skeletonArray = kinect.getSkeletonColorMap();
         removeUntrackedPlayers(skeletonArray);
 
         for (KSkeleton skeleton : skeletonArray) {
             if (skeleton.isTracked()) {
+
+                // Player data
                 int playerID = skeleton.getIndexColor();
                 KJoint[] kJoints = skeleton.getJoints();
 
-                int col = skeleton.getIndexColor();
-                this.app.fill(col);
-                this.app.stroke(col);
+                this.app.fill(playerID);
+                this.app.stroke(playerID);
 
                 PVector spineShoulder = mapCoordinates(kJoints[KinectPV2.JointType_SpineShoulder].getX(), kJoints[KinectPV2.JointType_SpineShoulder].getY(), kJoints[KinectPV2.JointType_SpineShoulder].getZ());
-                PVector handLeft = mapCoordinates(kJoints[KinectPV2.JointType_HandLeft].getX(), kJoints[KinectPV2.JointType_HandLeft].getY(), kJoints[KinectPV2.JointType_HandLeft].getZ());
-                PVector handRight = mapCoordinates(kJoints[KinectPV2.JointType_HandRight].getX(), kJoints[KinectPV2.JointType_HandRight].getY(), kJoints[KinectPV2.JointType_HandRight].getZ());
                 PVector shoulderLeft = mapCoordinates(kJoints[KinectPV2.JointType_ShoulderLeft].getX(), kJoints[KinectPV2.JointType_ShoulderLeft].getY(), kJoints[KinectPV2.JointType_ShoulderLeft].getZ());
                 PVector shoulderRight = mapCoordinates(kJoints[KinectPV2.JointType_ShoulderRight].getX(), kJoints[KinectPV2.JointType_ShoulderRight].getY(), kJoints[KinectPV2.JointType_ShoulderRight].getZ());
 
-                if (!Float.isNaN(spineShoulder.x) && !Float.isNaN(handLeft.x) && !Float.isNaN(handRight.x) && !Float.isNaN(shoulderLeft.x) && !Float.isNaN(shoulderRight.x)) {
+                if (!Float.isNaN(spineShoulder.x) && !Float.isNaN(shoulderLeft.x) && !Float.isNaN(shoulderRight.x)) {
                     this.joints.drawJoint(spineShoulder);
-                    this.joints.drawLine(spineShoulder, handLeft);
-                    this.joints.drawLine(spineShoulder, handRight);
                     this.joints.drawLine(shoulderLeft, shoulderRight);
-                    this.joints.drawHandPoint(handLeft, kJoints[KinectPV2.JointType_HandLeft].getState());
-                    this.joints.drawHandPoint(handRight, kJoints[KinectPV2.JointType_HandRight].getState());
 
+                    float shoulderDistance = PVector.dist(shoulderLeft, shoulderRight);
+                    this.joints.drawBox(shoulderLeft, shoulderDistance);
+                    this.joints.drawBox(shoulderRight, shoulderDistance);
 
-                    if (playerDistances.containsKey(playerID)) {
-                        float distance = playerDistances.get(playerID);
+                    updateHandPositions(skeleton);
 
-                        this.joints.drawBodySpace(spineShoulder, shoulderRight, shoulderLeft, distance);
+                    // Smoothed hand positions
+                    PVector smoothedLeftHand = leftHandPositions.get(playerID);
+                    PVector smoothedRightHand = rightHandPositions.get(playerID);
+
+                    if (smoothedLeftHand != null && smoothedRightHand != null) {
+                        PVector leftHandRelative = smoothedLeftHand.copy().sub(shoulderLeft);
+                        PVector rightHandRelative = smoothedRightHand.copy().sub(shoulderRight);
+
+                        PVector mappedLeftHand = mapToBox(leftHandRelative, shoulderDistance);
+                        PVector mappedRightHand = mapToBox(rightHandRelative, shoulderDistance);
 
                         this.app.fill(255);
-                        this.app.text("Distance: " + distance, spineShoulder.x, spineShoulder.y - 20);
+                        this.app.text("Left Hand: " + mappedLeftHand, smoothedLeftHand.x, smoothedLeftHand.y - 20);
+                        this.app.text("Right Hand: " + mappedRightHand, smoothedRightHand.x, smoothedRightHand.y - 20);
+
+                        if (playerDistances.containsKey(playerID)) {
+                            float distance = playerDistances.get(playerID);
+
+                            this.joints.drawBodySpace(spineShoulder, shoulderRight, shoulderLeft, distance);
+
+                            this.app.fill(255);
+                            this.app.text("Distance: " + distance, spineShoulder.x, spineShoulder.y - 20);
+                        }
                     }
                 }
             }
         }
+    }
+
+    private PVector mapToBox(PVector handRelative, float shoulderDistance) {
+        float mappedX = map(handRelative.x, -shoulderDistance / 2, shoulderDistance, -1, 1);
+        float mappedY = map(handRelative.y, -shoulderDistance / 2, shoulderDistance, -1, 1);
+
+        return new PVector(mappedX, mappedY);
+    }
+
+    private void updateHandPositions(KSkeleton skeleton) {
+        int playerID = skeleton.getIndexColor();
+        KJoint[] kJoints = skeleton.getJoints();
+
+        PVector handLeft = mapCoordinates(kJoints[KinectPV2.JointType_HandLeft].getX(), kJoints[KinectPV2.JointType_HandLeft].getY(), kJoints[KinectPV2.JointType_HandLeft].getZ());
+        PVector handRight = mapCoordinates(kJoints[KinectPV2.JointType_HandRight].getX(), kJoints[KinectPV2.JointType_HandRight].getY(), kJoints[KinectPV2.JointType_HandRight].getZ());
+
+        // Updates the history
+        leftHandHistory.computeIfAbsent(playerID, k -> new ArrayList<>()).add(handLeft);
+        rightHandHistory.computeIfAbsent(playerID, k -> new ArrayList<>()).add(handRight);
+
+        // Maintain the smoothing window size
+        if (leftHandHistory.get(playerID).size() > SMOOTHING_WINDOW) {
+            leftHandHistory.get(playerID).removeFirst();
+        }
+
+        if (rightHandHistory.get(playerID).size() > SMOOTHING_WINDOW) {
+            rightHandHistory.get(playerID).removeFirst();
+        }
+
+        // Smooth the hand position
+        PVector smoothedLeftHand = smoothHandPositions(leftHandHistory.get(playerID));
+        PVector smoothedRightHand = smoothHandPositions(rightHandHistory.get(playerID));
+
+        // Store the smoothed hand positions
+        leftHandPositions.put(playerID, smoothedLeftHand);
+        rightHandPositions.put(playerID, smoothedRightHand);
+    }
+
+    private PVector smoothHandPositions(List<PVector> handHistory) {
+        float sumX = 0, sumY = 0, sumZ = 0;
+        int count = handHistory.size();
+
+        for (PVector pos : handHistory) {
+            sumX += pos.x;
+            sumY += pos.y;
+            sumZ += pos.z;
+        }
+
+        return new PVector(sumX / count, sumY / count, sumZ / count);
     }
 
     public void showFPS() {
