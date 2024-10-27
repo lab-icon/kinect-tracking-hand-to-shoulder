@@ -1,8 +1,6 @@
 package com.icon.chick.utils.kinect;
 
-import KinectPV2.KinectPV2;
 import com.icon.chick.App;
-
 import KinectPV2.*;
 import org.jetbrains.annotations.NotNull;
 import processing.core.*;
@@ -52,31 +50,5 @@ public class Joints extends PApplet {
         this.app.rectMode(CENTER);
         this.app.rect(0, 0, PVector.dist(shoulderJoint1, shoulderJoint2) * 4, boxHeight * 2);
         this.app.popMatrix();
-    }
-
-    public void drawHandPoint(@NotNull PVector joint, int state) {
-        this.app.noStroke();
-        handState(state);
-        this.app.pushMatrix();
-        this.app.translate(joint.x, joint.y, joint.z);
-        this.app.ellipse(0, 0, 70, 70);
-        this.app.popMatrix();
-    }
-
-    void handState(int state) {
-        switch (state) {
-            case KinectPV2.HandState_Open:
-                this.app.fill(0, 255, 0);
-                break;
-            case KinectPV2.HandState_Closed:
-                this.app.fill(255, 0, 0);
-                break;
-            case KinectPV2.HandState_Lasso:
-                this.app.fill(0, 0, 255);
-                break;
-            case KinectPV2.HandState_NotTracked:
-                this.app.fill(100, 100, 100);
-                break;
-        }
     }
 }

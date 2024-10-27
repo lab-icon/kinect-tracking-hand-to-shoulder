@@ -128,30 +128,6 @@ public class Kinect extends PApplet {
         }
     }
 
-//    public Map<Integer, MappedCoordinates[]> getHandPositions() {
-//        Map<Integer, MappedCoordinates[]> handPositions = new HashMap<>();
-//        ArrayList<KSkeleton> skeletonArray = kinect.getSkeletonColorMap();
-//
-//        for (KSkeleton skeleton : skeletonArray) {
-//            if (skeleton.isTracked()) {
-//                int playerID = skeleton.getIndexColor();
-//                KJoint[] kJoints = skeleton.getJoints();
-//                updateHandPositions(playerID, kJoints);
-//
-//                PVector shoulderLeft = coordinateMapper.mapCoordinates(kJoints[KinectPV2.JointType_ShoulderLeft]);
-//                PVector shoulderRight = coordinateMapper.mapCoordinates(kJoints[KinectPV2.JointType_ShoulderRight]);
-//                float shoulderDistance = PVector.dist(shoulderLeft, shoulderRight) * 1.2f;
-//
-//                MappedCoordinates mappedLeftHand = coordinateMapper.mapToBox(leftHandPositions.get(playerID), shoulderLeft, shoulderDistance);
-//                MappedCoordinates mappedRightHand = coordinateMapper.mapToBox(rightHandPositions.get(playerID), shoulderRight, shoulderDistance);
-//
-//                handPositions.put(playerID, new MappedCoordinates[]{mappedLeftHand, mappedRightHand});
-//            }
-//        }
-//
-//        return handPositions;
-//    }
-
     public Map<Integer, MappedCoordinates[]> getHandPositions() {
         return kinect.getSkeletonColorMap().parallelStream()
                 .filter(KSkeleton::isTracked)
@@ -237,5 +213,4 @@ public class Kinect extends PApplet {
         leftHandPositions.put(playerID, smoothedLeftHand);
         rightHandPositions.put(playerID, smoothedRightHand);
     }
-
 }
