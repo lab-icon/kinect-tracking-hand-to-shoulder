@@ -9,7 +9,9 @@ import java.util.*;
 public class Kinect extends PApplet {
     private final App app;
     private final KinectPV2 kinect;
+    private final CoordinateMapper coordinateMapper;
     private final Joints joints;
+
     private final Boolean isInitialized;
     private Boolean isCalibrating = false;
     private Boolean needCalibration = true;
@@ -26,6 +28,7 @@ public class Kinect extends PApplet {
         this.app = app;
         this.joints = new Joints(app);
         this.kinect = new KinectPV2(this.app);
+        this.coordinateMapper = new CoordinateMapper(this.app, this.kinect);
 
         this.kinect.enableSkeletonColorMap(true);
         this.kinect.enableColorImg(true);
@@ -58,9 +61,9 @@ public class Kinect extends PApplet {
                 this.app.fill(playerID);
                 this.app.stroke(playerID);
 
-                PVector spineShoulder = mapCoordinates(kJoints[KinectPV2.JointType_SpineShoulder]);
-                PVector shoulderLeft = mapCoordinates(kJoints[KinectPV2.JointType_ShoulderLeft]);
-                PVector shoulderRight = mapCoordinates(kJoints[KinectPV2.JointType_ShoulderRight]);
+                PVector spineShoulder = coordinateMapper.mapCoordinates(kJoints[KinectPV2.JointType_SpineShoulder]);
+                PVector shoulderLeft = coordinateMapper.mapCoordinates(kJoints[KinectPV2.JointType_ShoulderLeft]);
+                PVector shoulderRight = coordinateMapper.mapCoordinates(kJoints[KinectPV2.JointType_ShoulderRight]);
 
                 if (!Float.isNaN(spineShoulder.x) && !Float.isNaN(shoulderLeft.x) && !Float.isNaN(shoulderRight.x)) {
                     this.joints.drawJoint(spineShoulder);
@@ -80,18 +83,18 @@ public class Kinect extends PApplet {
                     PVector smoothedRightHand = rightHandPositions.get(playerID);
 
                     if (smoothedLeftHand != null && smoothedRightHand != null) {
-                        PVector mappedLeftHand = mapToBox(smoothedLeftHand, shoulderLeft, betterShoulderDistance);
-                        PVector mappedRightHand = mapToBox(smoothedRightHand, shoulderRight, betterShoulderDistance);
+                        MappedCoordinates mappedLeftHand = coordinateMapper.mapToBox(smoothedLeftHand, shoulderLeft, betterShoulderDistance);
+                        MappedCoordinates mappedRightHand = coordinateMapper.mapToBox(smoothedRightHand, shoulderRight, betterShoulderDistance);
 
                         this.app.fill(0, 255, 0);
-                        this.app.ellipse(mappedLeftHand.x, mappedLeftHand.y, 20, 20);
+                        this.app.ellipse(mappedRightHand.corrected.x, mappedLeftHand.corrected.y, 20, 20);
                         this.app.fill(0, 0, 255);
-                        this.app.ellipse(mappedRightHand.x, mappedRightHand.y, 20, 20);
+                        this.app.ellipse(mappedRightHand.corrected.x, mappedRightHand.corrected.y, 20, 20);
 
 
                         this.app.fill(255);
-                        this.app.text("Left Hand: " + mappedLeftHand, smoothedLeftHand.x, smoothedLeftHand.y - 20);
-                        this.app.text("Right Hand: " + mappedRightHand, smoothedRightHand.x, smoothedRightHand.y - 20);
+                        this.app.text("Left Hand: " + mappedLeftHand.corrected, smoothedLeftHand.x, smoothedLeftHand.y - 20);
+                        this.app.text("Right Hand: " + mappedRightHand.corrected, smoothedRightHand.x, smoothedRightHand.y - 20);
 
                         if (playerDistances.containsKey(playerID)) {
                             float distance = playerDistances.get(playerID);
@@ -102,20 +105,6 @@ public class Kinect extends PApplet {
                 }
             }
         }
-    }
-
-    private PVector mapCoordinates(KJoint joint) {
-        float x = joint.getX(), y = joint.getY(), z = joint.getZ();
-        if (Float.isNaN(x) || Float.isNaN(y) || Float.isNaN(z) ||
-                Float.isInfinite(x) || Float.isInfinite(y) || Float.isInfinite(z)) {
-            return new PVector(Float.NaN, Float.NaN, Float.NaN);
-        }
-
-        float mappedX = map(x, 0, kinect.getColorImage().width, 0, this.app.width);
-        float mappedY = map(y, 0, kinect.getColorImage().height, 0, this.app.height);
-        float mappedZ = map(z, 0, 4500, 0, 100); // 4500 is the max depth value
-
-        return new PVector(mappedX, mappedY, mappedZ);
     }
 
     public void calibrate() {
@@ -159,19 +148,12 @@ public class Kinect extends PApplet {
         playerDistances.keySet().removeIf(playerId -> !trackedPlayerIds.contains(playerId));
     }
 
-    private PVector mapToBox(PVector hand, PVector shoulder, float shoulderDistance) {
-        PVector handRelative = hand.copy().sub(shoulder);
-        float mappedX = map(handRelative.x, -shoulderDistance, shoulderDistance, -1, 1);
-        float mappedY = map(handRelative.y, -shoulderDistance, shoulderDistance, -1, 1);
-        return new PVector(mappedX, mappedY);
-    }
-
     private void updateHandPositions(KSkeleton skeleton) {
         int playerID = skeleton.getIndexColor();
         KJoint[] kJoints = skeleton.getJoints();
 
-        PVector handLeft = mapCoordinates(kJoints[KinectPV2.JointType_HandLeft]);
-        PVector handRight = mapCoordinates(kJoints[KinectPV2.JointType_HandRight]);
+        PVector handLeft = coordinateMapper.mapCoordinates(kJoints[KinectPV2.JointType_HandLeft]);
+        PVector handRight = coordinateMapper.mapCoordinates(kJoints[KinectPV2.JointType_HandRight]);
 
         leftHandHistory.computeIfAbsent(playerID, k -> new ArrayList<>()).add(handLeft);
         rightHandHistory.computeIfAbsent(playerID, k -> new ArrayList<>()).add(handRight);
@@ -184,23 +166,11 @@ public class Kinect extends PApplet {
             rightHandHistory.get(playerID).removeFirst();
         }
 
-        PVector smoothedLeftHand = smoothHandPositions(leftHandHistory.get(playerID));
-        PVector smoothedRightHand = smoothHandPositions(rightHandHistory.get(playerID));
+        PVector smoothedLeftHand = coordinateMapper.smoothHandPositions(leftHandHistory.get(playerID));
+        PVector smoothedRightHand = coordinateMapper.smoothHandPositions(rightHandHistory.get(playerID));
 
         leftHandPositions.put(playerID, smoothedLeftHand);
         rightHandPositions.put(playerID, smoothedRightHand);
-    }
-
-    private PVector smoothHandPositions(List<PVector> handHistory) {
-        float sumX = 0, sumY = 0, sumZ = 0;
-        int count = handHistory.size();
-        for (PVector pos : handHistory) {
-            sumX += pos.x;
-            sumY += pos.y;
-            sumZ += pos.z;
-        }
-
-        return new PVector(sumX / count, sumY / count, sumZ / count);
     }
 
     private void displayMessage(String message) {
