@@ -13,8 +13,7 @@ public class App extends PApplet {
     // How to use a class outside the main
     Kinect kinect;
     Screen screen = new Screen(this);
-    Boolean needsCalibration = true;
-
+    
     @Override
     public void settings() {
         // change it to actual screen size

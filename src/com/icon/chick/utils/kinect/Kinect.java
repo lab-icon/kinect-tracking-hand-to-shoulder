@@ -4,14 +4,13 @@ import com.icon.chick.App;
 import processing.core.*;
 import KinectPV2.*;
 
-import java.lang.reflect.Array;
 import java.util.*;
 
 public class Kinect extends PApplet {
     private final App app;
     private final KinectPV2 kinect;
     private final Joints joints;
-    private Boolean isInitialized;
+    private final Boolean isInitialized;
     private Boolean needCalibration = true;
 
     private final Map<Integer, Float> playerDistances;
