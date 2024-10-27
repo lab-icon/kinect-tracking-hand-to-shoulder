@@ -1,3 +1,9 @@
+/**
+ * Project: ICON Lab - Kinect Hand to Shoulder Tracking
+ * Author: Eduardo Monteiro @ ICON LAB
+ * License: MIT License
+ */
+
 package com.icon.chick.utils.kinect;
 
 import com.icon.chick.App;
@@ -8,6 +14,9 @@ import KinectPV2.*;
 import java.util.*;
 import java.util.stream.Collectors;
 
+/**
+ * Kinect class for handling Kinect sensor operations and hand tracking.
+ */
 public class Kinect extends PApplet {
     private final App app;
     private final KinectPV2 kinect;
@@ -27,6 +36,11 @@ public class Kinect extends PApplet {
 
     private static final int SMOOTHING_WINDOW = 5;
 
+    /**
+     * Constructor for the Kinect class.
+     *
+     * @param app The main application instance.
+     */
     public Kinect(App app) {
         this.app = app;
         this.joints = new Joints(app);
@@ -41,6 +55,9 @@ public class Kinect extends PApplet {
         this.isInitialized = true;
     }
 
+    /**
+     * Draw method to render the Kinect color image and process skeleton data.
+     */
     public void draw() {
         this.app.image(kinect.getColorImage(), 0, 0, this.app.width, this.app.height);
 
@@ -56,6 +73,9 @@ public class Kinect extends PApplet {
         // this.debugVisuals(skeletonArray);
     }
 
+    /**
+     * Main processing method to handle hand positions.
+     */
     public void run() {
         Map<Integer, MappedCoordinates[]> handPositions = getHandPositions();
         for (Map.Entry<Integer, MappedCoordinates[]> entry : handPositions.entrySet()) {
@@ -69,7 +89,11 @@ public class Kinect extends PApplet {
         }
     }
 
-    public void debugVisuals(ArrayList<KSkeleton> skeletonArray) {
+    /**
+     * Debug method to visualize skeleton data.
+     * @param skeletonArray the list of skeletons to visualize.
+     */
+    private void debugVisuals(ArrayList<KSkeleton> skeletonArray) {
         for (KSkeleton skeleton : skeletonArray) {
             if (skeleton.isTracked()) {
                 if (this.needCalibration && this.isInitialized) {
@@ -128,6 +152,11 @@ public class Kinect extends PApplet {
         }
     }
 
+    /**
+     * Retrieves the hand positions for tracked skeletons.
+     *
+     * @return A map of player IDs to their corresponding hand positions.
+     */
     public Map<Integer, MappedCoordinates[]> getHandPositions() {
         return kinect.getSkeletonColorMap().parallelStream()
                 .filter(KSkeleton::isTracked)
@@ -151,6 +180,9 @@ public class Kinect extends PApplet {
                 ));
     }
 
+    /**
+     * Calibrates the Kinect sensor for the current environment.
+     */
     public void calibrate() {
     this.isCalibrating = true;
     System.out.println("CALIBRATING");
@@ -182,6 +214,11 @@ public class Kinect extends PApplet {
     this.isCalibrating = false;
 }
 
+    /**
+     * Removes players that are no longer tracked.
+     *
+     * @param trackedSkeletons The list of currently tracked skeletons.
+     */
     private void removeUntrackedPlayers(ArrayList<KSkeleton> trackedSkeletons) {
         Set<Integer> trackedPlayerIds = new HashSet<>();
         for (KSkeleton skeleton : trackedSkeletons) {
@@ -192,6 +229,12 @@ public class Kinect extends PApplet {
         playerDistances.keySet().removeIf(playerId -> !trackedPlayerIds.contains(playerId));
     }
 
+    /**
+     * Updates the hand positions for a given player.
+     *
+     * @param playerID The ID of the player.
+     * @param kJoints The array of joints for the player.
+     */
     private void updateHandPositions(int playerID, KJoint[] kJoints) {
         PVector handLeft = coordinateMapper.mapCoordinates(kJoints[KinectPV2.JointType_HandLeft]);
         PVector handRight = coordinateMapper.mapCoordinates(kJoints[KinectPV2.JointType_HandRight]);

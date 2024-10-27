@@ -5,17 +5,33 @@ import com.icon.chick.App;
 import processing.core.PConstants;
 import processing.core.PGraphics;
 
+/**
+ * The Screen class provides methods to display frames per second (FPS) and messages on the screen.
+ */
 public class Screen extends PApplet {
     App app;
 
+    /**
+     * Constructor for the Screen class.
+     *
+     * @param app The main application instance.
+     */
     public Screen(App app) {
         this.app = app;
     }
 
+    /**
+     * Displays the current frames per second (FPS) on the screen.
+     */
     public void showFPS() {
         this.app.text("FPS: " + frameRate, 50, 50);
     }
 
+    /**
+     * Displays a message on the screen.
+     *
+     * @param message The message to display.
+     */
     public void displayMessage(String message) {
         PGraphics pg = this.app.createGraphics(this.app.width, this.app.height);
         pg.beginDraw();

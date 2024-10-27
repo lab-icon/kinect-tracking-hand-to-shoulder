@@ -1,4 +1,10 @@
-package com.icon.chick;// ICON LAB 2024
+/**
+ * Project: ICON Lab - Kinect Hand to Shoulder Tracking
+ * Author: Eduardo Monteiro @ ICON LAB
+ * License: MIT License
+ */
+
+package com.icon.chick;
 
 import com.icon.chick.utils.kinect.Kinect;
 import com.icon.chick.utils.processing.Screen;
