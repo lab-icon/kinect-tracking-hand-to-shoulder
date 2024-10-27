@@ -24,6 +24,9 @@ public class Kinect extends PApplet {
     private final Map<Integer, List<PVector>> leftHandHistory = new HashMap<>();
     private final Map<Integer, List<PVector>> rightHandHistory = new HashMap<>();
 
+    private final Map<Integer, PVector> cachedLeftHandPositions = new HashMap<>();
+    private final Map<Integer, PVector> cachedRightHandPositions = new HashMap<>();
+
     private static final int SMOOTHING_WINDOW = 5;
 
     public Kinect(App app) {
@@ -123,7 +126,6 @@ public class Kinect extends PApplet {
         }
     }
 
-
     public Map<Integer, MappedCoordinates[]> getHandPositions() {
         Map<Integer, MappedCoordinates[]> handPositions = new HashMap<>();
         ArrayList<KSkeleton> skeletonArray = kinect.getSkeletonColorMap();
@@ -133,8 +135,8 @@ public class Kinect extends PApplet {
                 int playerID = skeleton.getIndexColor();
                 KJoint[] kJoints = skeleton.getJoints();
 
-                PVector handLeft = coordinateMapper.mapCoordinates(kJoints[KinectPV2.JointType_HandLeft]);
-                PVector handRight = coordinateMapper.mapCoordinates(kJoints[KinectPV2.JointType_HandRight]);
+                PVector handLeft = cachedLeftHandPositions.computeIfAbsent(playerID, k -> coordinateMapper.mapCoordinates(kJoints[KinectPV2.JointType_HandLeft]));
+                PVector handRight = cachedRightHandPositions.computeIfAbsent(playerID, k -> coordinateMapper.mapCoordinates(kJoints[KinectPV2.JointType_HandRight]));
 
                 leftHandHistory.computeIfAbsent(playerID, k -> new ArrayList<>()).add(handLeft);
                 rightHandHistory.computeIfAbsent(playerID, k -> new ArrayList<>()).add(handRight);
@@ -155,7 +157,7 @@ public class Kinect extends PApplet {
 
                 PVector shoulderLeft = coordinateMapper.mapCoordinates(kJoints[KinectPV2.JointType_ShoulderLeft]);
                 PVector shoulderRight = coordinateMapper.mapCoordinates(kJoints[KinectPV2.JointType_ShoulderRight]);
-                float shoulderDistance = PVector.dist(shoulderLeft, shoulderRight);
+                float shoulderDistance = PVector.dist(shoulderLeft, shoulderRight) * 1.2f;
 
                 MappedCoordinates mappedLeftHand = coordinateMapper.mapToBox(smoothedLeftHand, shoulderLeft, shoulderDistance);
                 MappedCoordinates mappedRightHand = coordinateMapper.mapToBox(smoothedRightHand, shoulderRight, shoulderDistance);
