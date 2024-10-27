@@ -111,6 +111,50 @@ public class Kinect extends PApplet {
         }
     }
 
+
+    public Map<Integer, MappedCoordinates[]> getHandPositions() {
+        Map<Integer, MappedCoordinates[]> handPositions = new HashMap<>();
+        ArrayList<KSkeleton> skeletonArray = kinect.getSkeletonColorMap();
+
+        for (KSkeleton skeleton : skeletonArray) {
+            if (skeleton.isTracked()) {
+                int playerID = skeleton.getIndexColor();
+                KJoint[] kJoints = skeleton.getJoints();
+
+                PVector handLeft = coordinateMapper.mapCoordinates(kJoints[KinectPV2.JointType_HandLeft]);
+                PVector handRight = coordinateMapper.mapCoordinates(kJoints[KinectPV2.JointType_HandRight]);
+
+                leftHandHistory.computeIfAbsent(playerID, k -> new ArrayList<>()).add(handLeft);
+                rightHandHistory.computeIfAbsent(playerID, k -> new ArrayList<>()).add(handRight);
+
+                if (leftHandHistory.get(playerID).size() > SMOOTHING_WINDOW) {
+                    leftHandHistory.get(playerID).removeFirst();
+                }
+
+                if (rightHandHistory.get(playerID).size() > SMOOTHING_WINDOW) {
+                    rightHandHistory.get(playerID).removeFirst();
+                }
+
+                PVector smoothedLeftHand = coordinateMapper.smoothHandPositions(leftHandHistory.get(playerID));
+                PVector smoothedRightHand = coordinateMapper.smoothHandPositions(rightHandHistory.get(playerID));
+
+                leftHandPositions.put(playerID, smoothedLeftHand);
+                rightHandPositions.put(playerID, smoothedRightHand);
+
+                PVector shoulderLeft = coordinateMapper.mapCoordinates(kJoints[KinectPV2.JointType_ShoulderLeft]);
+                PVector shoulderRight = coordinateMapper.mapCoordinates(kJoints[KinectPV2.JointType_ShoulderRight]);
+                float shoulderDistance = PVector.dist(shoulderLeft, shoulderRight);
+
+                MappedCoordinates mappedLeftHand = coordinateMapper.mapToBox(smoothedLeftHand, shoulderLeft, shoulderDistance);
+                MappedCoordinates mappedRightHand = coordinateMapper.mapToBox(smoothedRightHand, shoulderRight, shoulderDistance);
+
+                handPositions.put(playerID, new MappedCoordinates[]{mappedLeftHand, mappedRightHand});
+            }
+        }
+
+        return handPositions;
+    }
+
     public void calibrate() {
     this.isCalibrating = true;
     System.out.println("CALIBRATING");
