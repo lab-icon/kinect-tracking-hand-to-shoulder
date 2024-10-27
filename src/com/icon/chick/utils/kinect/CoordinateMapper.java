@@ -10,6 +10,8 @@ public class CoordinateMapper {
     private final App app;
     private final KinectPV2 kinect;
 
+    private static final float SMOOTHING_FACTOR = 0.2f;
+
     public CoordinateMapper(App app, KinectPV2 kinect) {
         this.app = app;
         this.kinect = kinect;
@@ -31,7 +33,7 @@ public class CoordinateMapper {
 
     public MappedCoordinates mapToBox(PVector hand, PVector shoulder, float shoulderDistance) {
         PVector handRelative = hand.copy().sub(shoulder);
-        float mappedX = PApplet.map(handRelative.x, -shoulderDistance, shoulderDistance, -1, 1);
+        float mappedX = PApplet.map(handRelative.x, shoulderDistance, -shoulderDistance, -1, 1);
         float mappedY = PApplet.map(handRelative.y, shoulderDistance, -shoulderDistance, -1, 1);
         PVector original = new PVector(mappedX, mappedY);
 
@@ -43,14 +45,18 @@ public class CoordinateMapper {
     }
 
     public PVector smoothHandPositions(List<PVector> handHistory) {
-        float sumX = 0, sumY = 0, sumZ = 0;
-        int count = handHistory.size();
-        for (PVector pos : handHistory) {
-            sumX += pos.x;
-            sumY += pos.y;
-            sumZ += pos.z;
+        if (handHistory.isEmpty()) {
+            return new PVector(Float.NaN, Float.NaN, Float.NaN);
         }
 
-        return new PVector(sumX / count, sumY / count, sumZ / count);
+        PVector smoothedPosition = handHistory.getFirst().copy();
+        for (int i = 1; i < handHistory.size(); i++) {
+            PVector currentPosition = handHistory.get(i);
+            smoothedPosition.x = SMOOTHING_FACTOR * currentPosition.x + (1 - SMOOTHING_FACTOR) * smoothedPosition.x;
+            smoothedPosition.y = SMOOTHING_FACTOR * currentPosition.y + (1 - SMOOTHING_FACTOR) * smoothedPosition.y;
+            smoothedPosition.z = SMOOTHING_FACTOR * currentPosition.z + (1 - SMOOTHING_FACTOR) * smoothedPosition.z;
+        }
+
+        return smoothedPosition;
     }
 }
