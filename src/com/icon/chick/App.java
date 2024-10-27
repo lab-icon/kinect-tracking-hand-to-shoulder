@@ -30,4 +30,13 @@ public class App extends PApplet {
         this.kinect.draw();
         this.screen.showFPS();
     }
+
+    @Override
+    public void keyPressed() {
+        if (this.key == PConstants.CODED) {
+            if (this.keyCode == PConstants.SHIFT) {
+                this.kinect.calibrate();
+            }
+        }
+    }
 }
