@@ -1,6 +1,7 @@
 package com.icon.chick.utils.kinect;
 
 import com.icon.chick.App;
+import com.icon.chick.utils.processing.Screen;
 import processing.core.*;
 import KinectPV2.*;
 
@@ -11,6 +12,7 @@ public class Kinect extends PApplet {
     private final KinectPV2 kinect;
     private final CoordinateMapper coordinateMapper;
     private final Joints joints;
+    private final Screen screen;
 
     private final Boolean isInitialized;
     private Boolean isCalibrating = false;
@@ -28,6 +30,7 @@ public class Kinect extends PApplet {
         this.app = app;
         this.joints = new Joints(app);
         this.kinect = new KinectPV2(this.app);
+        this.screen = new Screen(this.app);
         this.coordinateMapper = new CoordinateMapper(this.app, this.kinect);
 
         this.kinect.enableSkeletonColorMap(true);
@@ -37,12 +40,13 @@ public class Kinect extends PApplet {
         this.isInitialized = true;
     }
 
+    // ONLY FOR TESTING VISUALS
     public void draw() {
         this.app.image(kinect.getColorImage(), 0, 0, this.app.width, this.app.height);
 
         ArrayList<KSkeleton> skeletonArray = kinect.getSkeletonColorMap();
         if (skeletonArray.isEmpty() && !this.isCalibrating) {
-            displayMessage("No skeletons detected");
+            screen.displayMessage("No skeletons detected");
             return;
         }
 
@@ -110,7 +114,7 @@ public class Kinect extends PApplet {
     public void calibrate() {
     this.isCalibrating = true;
     System.out.println("CALIBRATING");
-    displayMessage("CALIBRATING...");
+    screen.displayMessage("CALIBRATING...");
 
     ArrayList<KSkeleton> skeletonArray = kinect.getSkeletonColorMap();
     System.out.println("Number of skeletons on calibration: " + skeletonArray.size());
@@ -128,12 +132,12 @@ public class Kinect extends PApplet {
             float averageDistance = totalDistance / 10;
             playerDistances.put(playerId, averageDistance);
 
-            displayMessage("CALIBRATED PLAYER " + playerId + " WITH DISTANCE " + averageDistance);
+            screen.displayMessage("CALIBRATED PLAYER " + playerId + " WITH DISTANCE " + averageDistance);
             System.out.println("CALIBRATED PLAYER " + playerId + " WITH DISTANCE " + averageDistance);
         }
     }
 
-    displayMessage("CALIBRATION COMPLETE");
+        screen.displayMessage("CALIBRATION COMPLETE");
     System.out.println("CALIBRATION COMPLETE");
     this.isCalibrating = false;
 }
@@ -173,17 +177,4 @@ public class Kinect extends PApplet {
         rightHandPositions.put(playerID, smoothedRightHand);
     }
 
-    private void displayMessage(String message) {
-        PGraphics pg = this.app.createGraphics(this.app.width, this.app.height);
-        pg.beginDraw();
-        pg.background(0);
-        pg.textAlign(PConstants.CENTER, PConstants.CENTER);
-        pg.textSize(32);
-        pg.fill(255);
-        pg.text(message, this.app.width / 2f, this.app.height / 2f);
-        pg.endDraw();
-
-        this.app.image(pg, 0, 0);
-        this.app.redraw();
-    }
 }
