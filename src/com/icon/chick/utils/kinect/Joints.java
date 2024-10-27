@@ -1,6 +1,6 @@
-package com.icon.utils.kinect;
+package com.icon.chick.utils.kinect;
 import KinectPV2.KinectPV2;
-import com.icon.App;
+import com.icon.chick.App;
 
 import KinectPV2.*;
 import org.jetbrains.annotations.NotNull;

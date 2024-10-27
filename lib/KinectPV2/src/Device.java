@@ -2,7 +2,7 @@ package KinectPV2.src.KinectPV2;
 
 /*
  Copyright (C) 2014  Thomas Sanchez Lengeling.
- KinectPV2, com.icon.Kinect for Windows v2 library for processing
+ KinectPV2, com.icon.utils.kinect.Kinect for Windows v2 library for processing
 
  Permission is hereby granted, free of charge, to any person obtaining a copy
  of this software and associated documentation files (the "Software"), to deal
@@ -849,7 +849,7 @@ public class Device implements Constants, FaceProperties, SkeletonProperties,
 			// boolean result = updateDevice();
 
 			// if(!result){
-			// System.out.println("Error updating com.icon.Kinect EXIT");
+			// System.out.println("Error updating com.icon.utils.kinect.Kinect EXIT");
 			// }
 			try {
 				Thread.sleep(fr); // 2

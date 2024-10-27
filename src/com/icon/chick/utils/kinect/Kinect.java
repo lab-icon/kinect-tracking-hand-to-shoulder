@@ -1,16 +1,18 @@
-package com.icon;
+package com.icon.chick.utils.kinect;
 
+import com.icon.chick.App;
 import processing.core.*;
 import KinectPV2.*;
-import com.icon.utils.kinect.Joints;
 
+import java.lang.reflect.Array;
 import java.util.*;
 
 public class Kinect extends PApplet {
     private final App app;
     private final KinectPV2 kinect;
     private final Joints joints;
-    private Boolean isCalibrated;
+    private Boolean isInitialized;
+    private Boolean needCalibration = true;
 
     private final Map<Integer, Float> playerDistances;
     private final Map<Integer, PVector> leftHandPositions;
@@ -23,7 +25,6 @@ public class Kinect extends PApplet {
     public Kinect(App app) {
         this.app = app;
         this.joints = new Joints(app);
-        this.isCalibrated = false;
 
         this.playerDistances = new HashMap<>();
         this.leftHandPositions = new HashMap<>();
@@ -37,78 +38,7 @@ public class Kinect extends PApplet {
         kinect.enableColorImg(true);
 
         kinect.init();
-    }
-
-    private PVector mapCoordinates(float x, float y, float z) {
-        if (Float.isNaN(x) || Float.isNaN(y) || Float.isNaN(z) ||
-                Float.isInfinite(x) || Float.isInfinite(y) || Float.isInfinite(z)) {
-            return new PVector(Float.NaN, Float.NaN, Float.NaN);
-        }
-
-        float mappedX = map(x, 0, kinect.getColorImage().width, 0, this.app.width);
-        float mappedY = map(y, 0, kinect.getColorImage().height, 0, this.app.height);
-        float mappedZ = map(z, 0, 4500, 0, 100); // 4500 is the max depth value
-
-        return new PVector(mappedX, mappedY, mappedZ);
-    }
-
-    public void calibrate() {
-        try {
-            PGraphics pg = this.app.createGraphics(this.app.width, this.app.height);
-            System.out.println("CALIBRATING");
-
-            pg.beginDraw();
-            pg.text("CALIBRATING...", (float) this.app.width / 2, (float) this.app.height / 2);
-            pg.endDraw();
-
-            this.app.image(pg, 0, 0);
-            Thread.sleep(3000);
-            pg.clear();
-
-            ArrayList<KSkeleton> skeletonArray = kinect.getSkeletonColorMap();
-            for (KSkeleton skeleton : skeletonArray) {
-                if (skeleton.isTracked()) {
-                    int playerId = skeleton.getIndexColor();
-                    KJoint[] kJoints = skeleton.getJoints();
-
-                    int numMeasurements = 10;
-                    float totalDistance = 0;
-
-                    for (int i = 0; i < numMeasurements; i++) {
-                        float shoulderToHandDistance = this.joints.calcJointDistance(kJoints[KinectPV2.JointType_ShoulderRight], kJoints[KinectPV2.JointType_HandRight]);
-                        totalDistance += shoulderToHandDistance;
-                        Thread.sleep(100); // Short delay between measurements
-                    }
-
-                    float averageDistance = totalDistance / numMeasurements;
-                    playerDistances.put(playerId, averageDistance);
-
-                    pg.beginDraw();
-                    pg.text("CALIBRATED: " + averageDistance, (float) this.app.width / 2, (float) this.app.height / 2);
-                    System.out.println("CALIBRATED: " + averageDistance);
-                    pg.endDraw();
-
-                    this.app.image(pg, 0, 0);
-                    pg.clear();
-                }
-            }
-
-            this.isCalibrated = true;
-
-        } catch (InterruptedException e) {
-            throw new RuntimeException(e);
-        }
-    }
-
-    private void removeUntrackedPlayers(ArrayList<KSkeleton> trackedSkeletons) {
-        Set<Integer> trackedPlayerIds = new HashSet<>();
-        for (KSkeleton skeleton : trackedSkeletons) {
-            if (skeleton.isTracked()) {
-                trackedPlayerIds.add(skeleton.getIndexColor());
-            }
-        }
-
-        playerDistances.keySet().removeIf(playerId -> !trackedPlayerIds.contains(playerId));
+        this.isInitialized = true;
     }
 
     public void draw() {
@@ -116,10 +46,17 @@ public class Kinect extends PApplet {
 
         // Map the skeleton joints to the screen and remove untracked players
         ArrayList<KSkeleton> skeletonArray = kinect.getSkeletonColorMap();
+        System.out.println("Number of skeletons detected initially:" + skeletonArray.size());
+        waitForSkeletons(skeletonArray);
         removeUntrackedPlayers(skeletonArray);
 
         for (KSkeleton skeleton : skeletonArray) {
             if (skeleton.isTracked()) {
+
+                if (this.needCalibration && this.isInitialized) {
+                    this.calibrate();
+                    this.needCalibration = false;
+                }
 
                 // Player data
                 int playerID = skeleton.getIndexColor();
@@ -137,7 +74,9 @@ public class Kinect extends PApplet {
                     this.joints.drawLine(shoulderLeft, shoulderRight);
 
                     float shoulderDistance = PVector.dist(shoulderLeft, shoulderRight);
+                    this.joints.drawJoint(shoulderLeft);
                     this.joints.drawBox(shoulderLeft, shoulderDistance);
+                    this.joints.drawJoint(shoulderRight);
                     this.joints.drawBox(shoulderRight, shoulderDistance);
 
                     updateHandPositions(skeleton);
@@ -147,11 +86,14 @@ public class Kinect extends PApplet {
                     PVector smoothedRightHand = rightHandPositions.get(playerID);
 
                     if (smoothedLeftHand != null && smoothedRightHand != null) {
-                        PVector leftHandRelative = smoothedLeftHand.copy().sub(shoulderLeft);
-                        PVector rightHandRelative = smoothedRightHand.copy().sub(shoulderRight);
+                        PVector mappedLeftHand = mapToBox(smoothedLeftHand, shoulderLeft, shoulderDistance);
+                        PVector mappedRightHand = mapToBox(smoothedRightHand, shoulderRight, shoulderDistance);
 
-                        PVector mappedLeftHand = mapToBox(leftHandRelative, shoulderDistance);
-                        PVector mappedRightHand = mapToBox(rightHandRelative, shoulderDistance);
+                        this.app.fill(0, 255, 0); // Green for left hand
+                        this.app.ellipse(mappedLeftHand.x, mappedLeftHand.y, 20, 20);
+                        this.app.fill(0, 0, 255); // Blue for right hand
+                        this.app.ellipse(mappedRightHand.x, mappedRightHand.y, 20, 20);
+
 
                         this.app.fill(255);
                         this.app.text("Left Hand: " + mappedLeftHand, smoothedLeftHand.x, smoothedLeftHand.y - 20);
@@ -171,9 +113,94 @@ public class Kinect extends PApplet {
         }
     }
 
-    private PVector mapToBox(PVector handRelative, float shoulderDistance) {
-        float mappedX = map(handRelative.x, -shoulderDistance / 2, shoulderDistance, -1, 1);
-        float mappedY = map(handRelative.y, -shoulderDistance / 2, shoulderDistance, -1, 1);
+    private PVector mapCoordinates(float x, float y, float z) {
+        if (Float.isNaN(x) || Float.isNaN(y) || Float.isNaN(z) ||
+                Float.isInfinite(x) || Float.isInfinite(y) || Float.isInfinite(z)) {
+            return new PVector(Float.NaN, Float.NaN, Float.NaN);
+        }
+
+        float mappedX = map(x, 0, kinect.getColorImage().width, 0, this.app.width);
+        float mappedY = map(y, 0, kinect.getColorImage().height, 0, this.app.height);
+        float mappedZ = map(z, 0, 4500, 0, 100); // 4500 is the max depth value
+
+        return new PVector(mappedX, mappedY, mappedZ);
+    }
+
+    public void calibrate() {
+    PGraphics pg = this.app.createGraphics(this.app.width, this.app.height);
+    System.out.println("CALIBRATING");
+
+    pg.beginDraw();
+    pg.background(0); // Clear the background
+    pg.textAlign(CENTER, CENTER);
+    pg.textSize(32);
+    pg.fill(255);
+    pg.text("CALIBRATING...", (float) this.app.width / 2, (float) this.app.height / 2);
+    pg.endDraw();
+
+    this.app.image(pg, 0, 0);
+    this.app.redraw(); // Force redraw to display the calibration text
+
+    ArrayList<KSkeleton> skeletonArray = kinect.getSkeletonColorMap();
+    System.out.println("Number of skeletons: " + skeletonArray.size());
+    for (KSkeleton skeleton : skeletonArray) {
+        if (skeleton.isTracked()) {
+            int playerId = skeleton.getIndexColor();
+            KJoint[] kJoints = skeleton.getJoints();
+
+            int numMeasurements = 10;
+            float totalDistance = 0;
+
+            for (int i = 0; i < numMeasurements; i++) {
+                float shoulderToHandDistance = this.joints.calcJointDistance(kJoints[KinectPV2.JointType_ShoulderRight], kJoints[KinectPV2.JointType_HandRight]);
+                totalDistance += shoulderToHandDistance;
+                System.out.println("Measurement " + (i + 1) + ": " + shoulderToHandDistance);
+            }
+
+            float averageDistance = totalDistance / numMeasurements;
+            playerDistances.put(playerId, averageDistance);
+
+            pg.beginDraw();
+            pg.background(0); // Clear the background
+            pg.textAlign(CENTER, CENTER);
+            pg.textSize(32);
+            pg.fill(255);
+            pg.text("CALIBRATED: " + averageDistance, (float) this.app.width / 2, (float) this.app.height / 2);
+            System.out.println("CALIBRATED: " + averageDistance);
+            pg.endDraw();
+
+            this.app.image(pg, 0, 0);
+            this.app.redraw(); // Force redraw to display the calibration result
+        }
+    }
+
+        pg.beginDraw();
+        pg.background(0); // Clear the background
+        pg.textAlign(CENTER, CENTER);
+        pg.textSize(32);
+        pg.fill(255);
+        pg.text("CALIBRATION COMPLETE", (float) this.app.width / 2, (float) this.app.height / 2);
+        System.out.println("CALIBRATION COMPLETE");
+        pg.endDraw();
+
+}
+
+    private void removeUntrackedPlayers(ArrayList<KSkeleton> trackedSkeletons) {
+        Set<Integer> trackedPlayerIds = new HashSet<>();
+        for (KSkeleton skeleton : trackedSkeletons) {
+            if (skeleton.isTracked()) {
+                trackedPlayerIds.add(skeleton.getIndexColor());
+            }
+        }
+
+        playerDistances.keySet().removeIf(playerId -> !trackedPlayerIds.contains(playerId));
+    }
+
+    private PVector mapToBox(PVector hand, PVector shoulder, float shoulderDistance) {
+        PVector handRelative = hand.copy().sub(shoulder);
+
+        float mappedX = map(handRelative.x, 0, shoulderDistance / 2, -1, 1);
+        float mappedY = map(handRelative.y, -shoulderDistance / 2, shoulderDistance / 2, -1, 1);
 
         return new PVector(mappedX, mappedY);
     }
@@ -220,8 +247,19 @@ public class Kinect extends PApplet {
         return new PVector(sumX / count, sumY / count, sumZ / count);
     }
 
-    public void showFPS() {
-        this.app.text("FPS: " + frameRate, 50, 50);
+    private void waitForSkeletons(ArrayList<KSkeleton> skeletonArray) {
+        if (skeletonArray.isEmpty()) {
+            // Display text if no skeletons are detected
+            PGraphics pg = this.app.createGraphics(this.app.width, this.app.height);
+            pg.beginDraw();
+            pg.background(0); // Clear the background
+            pg.textAlign(CENTER, CENTER);
+            pg.textSize(32);
+            pg.fill(255);
+            pg.text("Waiting for skeletons...", (float) this.app.width / 2, (float) this.app.height / 2);
+            pg.endDraw();
+            this.app.image(pg, 0, 0);
+            this.app.redraw(); // Force redraw to display the text
+        }
     }
-
 }
