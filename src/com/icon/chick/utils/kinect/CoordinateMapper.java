@@ -32,7 +32,7 @@ public class CoordinateMapper {
     public MappedCoordinates mapToBox(PVector hand, PVector shoulder, float shoulderDistance) {
         PVector handRelative = hand.copy().sub(shoulder);
         float mappedX = PApplet.map(handRelative.x, -shoulderDistance, shoulderDistance, -1, 1);
-        float mappedY = PApplet.map(handRelative.y, -shoulderDistance, shoulderDistance, -1, 1);
+        float mappedY = PApplet.map(handRelative.y, shoulderDistance, -shoulderDistance, -1, 1);
         PVector original = new PVector(mappedX, mappedY);
 
         float correctedX = Math.max(-1, Math.min(1, mappedX));
