@@ -1,4 +1,5 @@
 package com.icon.chick.utils.kinect;
+
 import KinectPV2.KinectPV2;
 import com.icon.chick.App;
 
