@@ -6,6 +6,7 @@ import processing.core.*;
 import KinectPV2.*;
 
 import java.util.*;
+import java.util.stream.Collectors;
 
 public class Kinect extends PApplet {
     private final App app;
@@ -21,11 +22,8 @@ public class Kinect extends PApplet {
     private final Map<Integer, Float> playerDistances = new HashMap<>();
     private final Map<Integer, PVector> leftHandPositions = new HashMap<>();
     private final Map<Integer, PVector> rightHandPositions = new HashMap<>();
-    private final Map<Integer, List<PVector>> leftHandHistory = new HashMap<>();
-    private final Map<Integer, List<PVector>> rightHandHistory = new HashMap<>();
-
-    private final Map<Integer, PVector> cachedLeftHandPositions = new HashMap<>();
-    private final Map<Integer, PVector> cachedRightHandPositions = new HashMap<>();
+    private final Map<Integer, ArrayDeque<PVector>> leftHandHistory = new HashMap<>();
+    private final Map<Integer, ArrayDeque<PVector>> rightHandHistory = new HashMap<>();
 
     private static final int SMOOTHING_WINDOW = 5;
 
@@ -43,7 +41,6 @@ public class Kinect extends PApplet {
         this.isInitialized = true;
     }
 
-    // ONLY FOR TESTING VISUALS
     public void draw() {
         this.app.image(kinect.getColorImage(), 0, 0, this.app.width, this.app.height);
 
@@ -131,28 +128,51 @@ public class Kinect extends PApplet {
         }
     }
 
+//    public Map<Integer, MappedCoordinates[]> getHandPositions() {
+//        Map<Integer, MappedCoordinates[]> handPositions = new HashMap<>();
+//        ArrayList<KSkeleton> skeletonArray = kinect.getSkeletonColorMap();
+//
+//        for (KSkeleton skeleton : skeletonArray) {
+//            if (skeleton.isTracked()) {
+//                int playerID = skeleton.getIndexColor();
+//                KJoint[] kJoints = skeleton.getJoints();
+//                updateHandPositions(playerID, kJoints);
+//
+//                PVector shoulderLeft = coordinateMapper.mapCoordinates(kJoints[KinectPV2.JointType_ShoulderLeft]);
+//                PVector shoulderRight = coordinateMapper.mapCoordinates(kJoints[KinectPV2.JointType_ShoulderRight]);
+//                float shoulderDistance = PVector.dist(shoulderLeft, shoulderRight) * 1.2f;
+//
+//                MappedCoordinates mappedLeftHand = coordinateMapper.mapToBox(leftHandPositions.get(playerID), shoulderLeft, shoulderDistance);
+//                MappedCoordinates mappedRightHand = coordinateMapper.mapToBox(rightHandPositions.get(playerID), shoulderRight, shoulderDistance);
+//
+//                handPositions.put(playerID, new MappedCoordinates[]{mappedLeftHand, mappedRightHand});
+//            }
+//        }
+//
+//        return handPositions;
+//    }
+
     public Map<Integer, MappedCoordinates[]> getHandPositions() {
-        Map<Integer, MappedCoordinates[]> handPositions = new HashMap<>();
-        ArrayList<KSkeleton> skeletonArray = kinect.getSkeletonColorMap();
+        return kinect.getSkeletonColorMap().parallelStream()
+                .filter(KSkeleton::isTracked)
+                .collect(Collectors.toMap(
+                        KSkeleton::getIndexColor,
+                        skeleton -> {
+                            int playerID = skeleton.getIndexColor();
+                            KJoint[] kJoints = skeleton.getJoints();
 
-        for (KSkeleton skeleton : skeletonArray) {
-            if (skeleton.isTracked()) {
-                int playerID = skeleton.getIndexColor();
-                KJoint[] kJoints = skeleton.getJoints();
-                updateHandPositions(playerID, kJoints);
+                            updateHandPositions(playerID, kJoints);
 
-                PVector shoulderLeft = coordinateMapper.mapCoordinates(kJoints[KinectPV2.JointType_ShoulderLeft]);
-                PVector shoulderRight = coordinateMapper.mapCoordinates(kJoints[KinectPV2.JointType_ShoulderRight]);
-                float shoulderDistance = PVector.dist(shoulderLeft, shoulderRight) * 1.2f;
+                            PVector shoulderLeft = coordinateMapper.mapCoordinates(kJoints[KinectPV2.JointType_ShoulderLeft]);
+                            PVector shoulderRight = coordinateMapper.mapCoordinates(kJoints[KinectPV2.JointType_ShoulderRight]);
+                            float shoulderDistance = PVector.dist(shoulderLeft, shoulderRight) * 1.2f;
 
-                MappedCoordinates mappedLeftHand = coordinateMapper.mapToBox(leftHandPositions.get(playerID), shoulderLeft, shoulderDistance);
-                MappedCoordinates mappedRightHand = coordinateMapper.mapToBox(rightHandPositions.get(playerID), shoulderRight, shoulderDistance);
+                            MappedCoordinates mappedLeftHand = coordinateMapper.mapToBox(leftHandPositions.get(playerID), shoulderLeft, shoulderDistance);
+                            MappedCoordinates mappedRightHand = coordinateMapper.mapToBox(rightHandPositions.get(playerID), shoulderRight, shoulderDistance);
 
-                handPositions.put(playerID, new MappedCoordinates[]{mappedLeftHand, mappedRightHand});
-            }
-        }
-
-        return handPositions;
+                            return new MappedCoordinates[]{mappedLeftHand, mappedRightHand};
+                        }
+                ));
     }
 
     public void calibrate() {
@@ -197,22 +217,22 @@ public class Kinect extends PApplet {
     }
 
     private void updateHandPositions(int playerID, KJoint[] kJoints) {
-        PVector handLeft = cachedLeftHandPositions.computeIfAbsent(playerID, k -> coordinateMapper.mapCoordinates(kJoints[KinectPV2.JointType_HandLeft]));
-        PVector handRight = cachedRightHandPositions.computeIfAbsent(playerID, k -> coordinateMapper.mapCoordinates(kJoints[KinectPV2.JointType_HandRight]));
+        PVector handLeft = coordinateMapper.mapCoordinates(kJoints[KinectPV2.JointType_HandLeft]);
+        PVector handRight = coordinateMapper.mapCoordinates(kJoints[KinectPV2.JointType_HandRight]);
 
-        leftHandHistory.computeIfAbsent(playerID, k -> new ArrayList<>()).add(handLeft);
-        rightHandHistory.computeIfAbsent(playerID, k -> new ArrayList<>()).add(handRight);
+        leftHandHistory.computeIfAbsent(playerID, k -> new ArrayDeque<>()).add(handLeft);
+        rightHandHistory.computeIfAbsent(playerID, k -> new ArrayDeque<>()).add(handRight);
 
         if (leftHandHistory.get(playerID).size() > SMOOTHING_WINDOW) {
-            leftHandHistory.get(playerID).removeFirst();
+            leftHandHistory.get(playerID).poll();
         }
 
         if (rightHandHistory.get(playerID).size() > SMOOTHING_WINDOW) {
-            rightHandHistory.get(playerID).removeFirst();
+            rightHandHistory.get(playerID).poll();
         }
 
-        PVector smoothedLeftHand = coordinateMapper.smoothHandPositions(leftHandHistory.get(playerID));
-        PVector smoothedRightHand = coordinateMapper.smoothHandPositions(rightHandHistory.get(playerID));
+        PVector smoothedLeftHand = coordinateMapper.smoothHandPositions(new ArrayList<>(leftHandHistory.get(playerID)));
+        PVector smoothedRightHand = coordinateMapper.smoothHandPositions(new ArrayList<>(rightHandHistory.get(playerID)));
 
         leftHandPositions.put(playerID, smoothedLeftHand);
         rightHandPositions.put(playerID, smoothedRightHand);
